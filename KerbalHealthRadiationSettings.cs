@@ -15,27 +15,27 @@
         {
             case GameParameters.Preset.Easy:
                     RadiationEnabled = false;
-                    RadiationEffect = 0.1f;
+                    RadiationEffect = 0.05f;
                     ShieldingEffect = 2;
                     EVAExposure = 1;
                     break;
             case GameParameters.Preset.Normal:
                     RadiationEnabled = true;
-                    RadiationEffect = 0.1f;
+                    RadiationEffect = 0.05f;
                     ShieldingEffect = 2;
                     EVAExposure = 1;
                     break;
             case GameParameters.Preset.Moderate:
                     RadiationEnabled = true;
-                    RadiationEffect = 0.1f;
+                    RadiationEffect = 0.05f;
                     ShieldingEffect = 1;
-                    EVAExposure = 3;
+                    EVAExposure = 2;
                     break;
             case GameParameters.Preset.Hard:
                     RadiationEnabled = true;
-                    RadiationEffect = 0.25f;
+                    RadiationEffect = 0.1f;
                     ShieldingEffect = 1;
-                    EVAExposure = 10;
+                    EVAExposure = 5;
                     break;
         }
     }
@@ -43,17 +43,17 @@
         [GameParameters.CustomParameterUI("Radiation Enabled", toolTip = "Degrade max health based on accumulated dose")]
         public bool RadiationEnabled = true;
 
-        [GameParameters.CustomFloatParameterUI("Radiation Effect", toolTip = "Percentage of max health drained by 1e7 (10M) doses. 0 to disable effect", minValue = 0, maxValue = 2, displayFormat = "N2", asPercentage = true, stepCount = 41)]
-        public float RadiationEffect = 0.25f;
+        [GameParameters.CustomFloatParameterUI("Radiation Effect", toolTip = "Percentage of max health drained by 1e7 (10M) doses. 0 to disable effect", minValue = 0, maxValue = 1, displayFormat = "N2", asPercentage = true, stepCount = 41)]
+        public float RadiationEffect = 0.1f;
 
         [GameParameters.CustomFloatParameterUI("Shielding Multiplier", toolTip = "Efficiency of radiation shielding provided by parts and resources", minValue = 0, maxValue = 2, displayFormat = "N2", asPercentage = true, stepCount = 41)]
         public float ShieldingEffect = 1;
 
         [GameParameters.CustomFloatParameterUI("In Space High Coefficient", toolTip = "How much cosmic radiation reaches vessels in high planetary orbit or on moons", minValue = 0, maxValue = 1, displayFormat = "N2", asPercentage = true, stepCount = 21)]
-        public float InSpaceHighCoefficient = 0.50f;
+        public float InSpaceHighCoefficient = 0.30f;
 
-        [GameParameters.CustomFloatParameterUI("In Space Low Coefficient", toolTip = "How much cosmic radiation reaches vessels in low planetary orbits", minValue = 0, maxValue = 0.5f, displayFormat = "N2", asPercentage = true, stepCount = 21)]
-        public float InSpaceLowCoefficient = 0.10f;
+        [GameParameters.CustomFloatParameterUI("In Space Low Coefficient", toolTip = "How much cosmic radiation reaches vessels in low planetary orbits", minValue = 0, maxValue = 1, displayFormat = "N2", asPercentage = true, stepCount = 21)]
+        public float InSpaceLowCoefficient = 0.20f;
 
         [GameParameters.CustomFloatParameterUI("Stratosphere Transparency", toolTip = "How much cosmic radiation reaches outer layers of the atmosphere from space", minValue = 0, maxValue = 1, displayFormat = "N2", asPercentage = true, stepCount = 21)]
         public float StratoCoefficient = 0.2f;
@@ -61,16 +61,34 @@
         [GameParameters.CustomFloatParameterUI("Troposphere Transparency", toolTip = "How much cosmic radiation reaches the ground and lower layers of the atmosphere from space", minValue = 0, maxValue = 0.05f, displayFormat = "N4", asPercentage = true, stepCount = 51)]
         public float TroposphereCoefficient = 0.01f;
 
-        [GameParameters.CustomFloatParameterUI("Body Shielding Altitude", toolTip = "The max altitude where the celestial body blocks half of radiation, in % of its radius", minValue = 0, maxValue = 0.1f, displayFormat = "N4", asPercentage = true, stepCount = 21)]
-        public float BodyShieldingAltitude = 0.01f;
+        [GameParameters.CustomFloatParameterUI("EVA Exposure Multiplier", toolTip = "How much more radiaiton kerbals receive when on EVA", minValue = 0, maxValue = 10, displayFormat = "N0", stepCount = 21)]
+        public float EVAExposure = 5;
 
-        [GameParameters.CustomFloatParameterUI("EVA Exposure Multiplier", toolTip = "How much more radiaiton kerbals receive when on EVA", minValue = 0, maxValue = 20, displayFormat = "N0", stepCount = 21)]
-        public float EVAExposure = 10;
-
-        [GameParameters.CustomFloatParameterUI("Solar Radiation (Nominal)", toolTip = "Solar radiation in interplanetary space at 1 AU, banana doses/day", minValue = 0, maxValue = 20000, displayFormat = "N0", stepCount = 21)]
+        [GameParameters.CustomFloatParameterUI("Solar Radiation (Nominal)", toolTip = "Solar radiation in interplanetary space at 1 AU, banana doses/day", minValue = 0, maxValue = 10000, displayFormat = "N0", stepCount = 21)]
         public float SolarRadiation = 5000;
 
-        [GameParameters.CustomFloatParameterUI("Galactic Radiation", toolTip = "Galactic cosmic radiation in interplanetary space, banana doses/day", minValue = 0, maxValue = 20000, displayFormat = "N0", stepCount = 21)]
-        public float GalacticRadiation = 5000;
+        [GameParameters.CustomFloatParameterUI("Galactic Radiation", toolTip = "Galactic cosmic radiation in interplanetary space, banana doses/day", minValue = 0, maxValue = 30000, displayFormat = "N0", stepCount = 31)]
+        public float GalacticRadiation = 15000;
+
+        [GameParameters.CustomFloatParameterUI("Decontamination Rate per Day", toolTip = "How much radiation is lost per day during decontamination", minValue = 1000, maxValue = 1000000, displayFormat = "N0", logBase = 10)]
+        public float DecontaminationRate = 100000;
+
+        [GameParameters.CustomFloatParameterUI("Decontamination Health Loss", toolTip = "How much health is lost while the kerbal is decontaminating", minValue = 0, maxValue = 1, displayFormat = "N2", asPercentage = true)]
+        public float DecontaminationHealthLoss = 0.75f;
+
+        [GameParameters.CustomFloatParameterUI("Decontamination Funds Cost", toolTip = "How much Funds each decontamination procedure costs (Career only)", minValue = 0, maxValue = 1000000, displayFormat = "N0")]
+        public float DecontaminationFundsCost = 100000;
+
+        [GameParameters.CustomFloatParameterUI("Decontamination Science Cost", toolTip = "How much Science each decontamination procedure costs (Career & Science modes)", minValue = 0, maxValue = 10000, displayFormat = "N0")]
+        public float DecontaminationScienceCost = 1000;
+
+        [GameParameters.CustomIntParameterUI("Astronaut Complex Level for Decon", toolTip = "Min level of the Astronaut Complex for Decontamination", minValue = 0, maxValue = 3)]
+        public int DecontaminationAstronautComplexLevel = 3;
+
+        [GameParameters.CustomIntParameterUI("R&D Level for Decon", toolTip = "Min level of the Research & Development Facility for Decontamination", minValue = 0, maxValue = 3)]
+        public int DecontaminationRNDLevel = 3;
+
+        //[GameParameters.CustomParameterUI("Decontamination Causes Level Loss", toolTip = "The decontaminated kerbal loses 1 experience level")]
+        public bool DecontaminationLevelLoss = false;
     }
 }

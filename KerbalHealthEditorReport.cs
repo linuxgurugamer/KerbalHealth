@@ -14,7 +14,7 @@ namespace KerbalHealth
         Rect reportPosition = new Rect(0.5f, 0.5f, 300, 50);
         PopupDialog reportWindow;  // Health Report window
         System.Collections.Generic.List<DialogGUIBase> gridContents;  // Health Report grid's labels
-        DialogGUILabel shieldingLbl, exposureLbl;
+        DialogGUILabel spaceLbl, recupLbl, shieldingLbl, exposureLbl;
         int colNum = 3;  // # of columns in Health Report
         static bool healthModulesEnabled = true;
 
@@ -55,9 +55,9 @@ namespace KerbalHealth
             gridContents = new List<DialogGUIBase>((Core.KerbalHealthList.Count + 1) * colNum)
             {
                 // Creating column titles
-                new DialogGUILabel("Name", true),
-                new DialogGUILabel("Trend", true),
-                new DialogGUILabel("Time Left", true)
+                new DialogGUILabel("<b><color=\"white\">Name</color></b>", true),
+                new DialogGUILabel("<b><color=\"white\">Trend</color></b>", true),
+                new DialogGUILabel("<b><color=\"white\">Time Left</color></b>", true)
             };
             // Initializing Health Report's grid with empty labels, to be filled in Update()
             for (int i = 0; i < ShipConstruction.ShipManifest.CrewCount * colNum; i++)
@@ -80,17 +80,22 @@ namespace KerbalHealth
                     reportPosition,
                     new DialogGUIGridLayout(new RectOffset(0, 0, 0, 0), new Vector2(80, 30), new Vector2(20, 0), UnityEngine.UI.GridLayoutGroup.Corner.UpperLeft, UnityEngine.UI.GridLayoutGroup.Axis.Horizontal, TextAnchor.MiddleCenter, UnityEngine.UI.GridLayoutGroup.Constraint.FixedColumnCount, colNum, gridContents.ToArray()),
                     new DialogGUIHorizontalLayout(
-                        new DialogGUILabel("Shielding: ", false),
+                        new DialogGUILabel("<color=\"white\">Space: </color>", false),
+                        spaceLbl = new DialogGUILabel("N/A", true),
+                        new DialogGUILabel("<color=\"white\">Recuperation: </color>", false),
+                        recupLbl = new DialogGUILabel("N/A", true)),
+                    new DialogGUIHorizontalLayout(
+                        new DialogGUILabel("<color=\"white\">Shielding: </color>", false),
                         shieldingLbl = new DialogGUILabel("N/A", true),
-                        new DialogGUILabel("Exposure: ", false),
+                        new DialogGUILabel("<color=\"white\">Exposure: </color>", false),
                         exposureLbl = new DialogGUILabel("N/A", true)),
                     new DialogGUIHorizontalLayout(
                         new DialogGUILabel("", true),
                         new DialogGUILabel("Factors", true),
                         new DialogGUIButton("Reset", OnResetButtonSelected, false)),
                     new DialogGUIGridLayout(new RectOffset(0, 0, 0, 0), new Vector2(140, 30), new Vector2(20, 0), UnityEngine.UI.GridLayoutGroup.Corner.UpperLeft, UnityEngine.UI.GridLayoutGroup.Axis.Horizontal, TextAnchor.MiddleCenter, UnityEngine.UI.GridLayoutGroup.Constraint.FixedColumnCount, 2, checklist.ToArray())),
-                false, 
-                HighLogic.UISkin, 
+                false,
+                HighLogic.UISkin,
                 false);
             Invalidate();
         }
@@ -105,9 +110,9 @@ namespace KerbalHealth
             Invalidate();
         }
 
-        string GetShielding() => (ShipConstruction.ShipManifest.CrewCount != 0) ? Core.KerbalHealthList.Find(ShipConstruction.ShipManifest.GetAllCrew(false)[0]).Shielding.ToString("F1") : "N/A";
+        string GetShielding() => (ShipConstruction.ShipManifest.CrewCount != 0) ? Core.KerbalHealthList.Find(ShipConstruction.ShipManifest.GetAllCrew(false)[0]).VesselModifiers.Shielding.ToString("F1") : "N/A";
 
-        string GetExposure() => (ShipConstruction.ShipManifest.CrewCount != 0) ? Core.KerbalHealthList.Find(ShipConstruction.ShipManifest.GetAllCrew(false)[0]).Exposure.ToString("P1") : "N/A";
+        string GetExposure() => (ShipConstruction.ShipManifest.CrewCount != 0) ? Core.KerbalHealthList.Find(ShipConstruction.ShipManifest.GetAllCrew(false)[0]).LastExposure.ToString("P1") : "N/A";
 
         public void UndisplayData()
         {
@@ -142,14 +147,15 @@ namespace KerbalHealth
                 // Fill the Health Report's grid with kerbals' health data
                 int i = 0;
                 KerbalHealthStatus khs = null;
+                HealthModifierSet.VesselCache.Clear();
                 foreach (ProtoCrewMember pcm in ShipConstruction.ShipManifest.GetAllCrew(false))
                 {
                     if (pcm == null) continue;
                     gridContents[(i + 1) * colNum].SetOptionText(pcm.name);
-                    khs = Core.KerbalHealthList.Find(pcm)?.Clone();
+                    khs = Core.KerbalHealthList?.Find(pcm)?.Clone();
                     if (khs == null)
                     {
-                        Core.Log("Could not create a clone of KerbalHealthStatus for " + pcm.name + ". KerbalHealthList contains " + Core.KerbalHealthList.Count + " records.", Core.LogLevel.Error);
+                        Core.Log("Could not create a clone of KerbalHealthStatus for " + pcm.name + ". It is " + ((Core.KerbalHealthList?.Find(pcm) == null) ? "not " : "") + "found in KerbalHealthList, which contains " + Core.KerbalHealthList.Count + " records.", Core.LogLevel.Error);
                         i++;
                         continue;
                     }
@@ -165,8 +171,10 @@ namespace KerbalHealth
                     gridContents[(i + 1) * colNum + 2].SetOptionText(s);
                     i++;
                 }
-                shieldingLbl.SetOptionText(khs.Shielding.ToString("F1"));
-                exposureLbl.SetOptionText(khs.Exposure.ToString("P1"));
+                spaceLbl.SetOptionText("<color=\"white\">" + khs.VesselModifiers.Space.ToString("F1") + "</color>");
+                recupLbl.SetOptionText("<color=\"white\">" + khs.VesselModifiers.Recuperation.ToString("F1") + "%</color>");
+                shieldingLbl.SetOptionText("<color=\"white\">" + khs.VesselModifiers.Shielding.ToString("F1") + "</color>");
+                exposureLbl.SetOptionText("<color=\"white\">" + khs.LastExposure.ToString("P1") + "</color>");
                 dirty = false;
             }
         }

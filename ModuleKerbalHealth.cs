@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace KerbalHealth
 {
     public class ModuleKerbalHealth : PartModule, IResourceConsumer
     {
         [KSPField]
-        string title = "";  // Module title displayed in right-click menu (empty string for auto)
+        public string title = "";  // Module title displayed in right-click menu (empty string for auto)
 
         [KSPField]
         public float hpChangePerDay = 0;  // How many raw HP per day every affected kerbal gains
@@ -31,6 +30,9 @@ namespace KerbalHealth
         public int crewCap = 0;  // Max crew this module's multiplier applies to without penalty, 0 for unlimited (a.k.a. free multiplier)
 
         [KSPField]
+        public double space = 0;  // Points of living space provided by the part (used to calculate Confinement factor)
+
+        [KSPField]
         public float shielding = 0;  // Number of halving-thicknesses
 
         [KSPField]
@@ -45,9 +47,6 @@ namespace KerbalHealth
         [KSPField]
         public float resourceConsumptionPerKerbal = 0;  // EC consumption per affected kerbal (units per second)
 
-        [KSPField]
-        public bool alwaysActive = false;  // Is the module's effect (and consumption) always active or togglable in-flight
-
         [KSPField(isPersistant = true)]
         public bool isActive = true;  // If not alwaysActive, this determines if the module is active
 
@@ -58,40 +57,42 @@ namespace KerbalHealth
 
         public HealthFactor MultiplyFactor
         {
-            get => Core.FindFactor(multiplyFactor);
+            get => Core.GetHealthFactor(multiplyFactor);
             set => multiplyFactor = value.Name;
         }
 
-        public bool IsModuleActive => (alwaysActive || isActive) && !starving;
+        public bool IsAlwaysActive => (resourceConsumption == 0) && (resourceConsumptionPerKerbal == 0);
+
+        public bool IsModuleActive => IsAlwaysActive || (isActive && (!Core.IsInEditor || KerbalHealthEditorReport.HealthModulesEnabled) && !starving);
+
+        /// <summary>
+        /// Returns total # of kerbals affected by this module
+        /// </summary>
+        public int TotalAffectedCrewCount
+        {
+            get
+            {
+                if (Core.IsInEditor)
+                    if (partCrewOnly)
+                    {
+                        int r = 0;
+                        foreach (ProtoCrewMember pcm in ShipConstruction.ShipManifest.GetPartCrewManifest(part.craftID).GetPartCrew())
+                            if (pcm != null) r++;
+                        Core.Log(r + " kerbal(s) found in " + part?.name + ".");
+                        return r;
+                    }
+                    else return ShipConstruction.ShipManifest.CrewCount;
+                else if (partCrewOnly) return part.protoModuleCrew.Count;
+                else return vessel.GetCrewCount();
+            }
+        }
 
         /// <summary>
         /// Returns # of kerbals affected by this module, capped by crewCap
         /// </summary>
-        public int AffectedCrewCount
-        {
-            get
-            {
-                int r = 0;
-                if (Core.IsInEditor)
-                    if (partCrewOnly)
-                    {
-                        foreach (ProtoCrewMember pcm in ShipConstruction.ShipManifest.GetPartCrewManifest(part.craftID).GetPartCrew())
-                            if (pcm != null) r++;
-                        Core.Log(r + " kerbals found in " + part?.name + ".");
-                    }
-                    else r = ShipConstruction.ShipManifest.CrewCount;
-                else if (partCrewOnly) r = part.protoModuleCrew.Count;
-                else r = vessel.GetCrewCount();
-                if (crewCap > 0) return Math.Min(r, crewCap);
-                else return r;
-            }
-        }
+        public int CappedAffectedCrewCount => crewCap > 0 ? Math.Min(TotalAffectedCrewCount, crewCap) : TotalAffectedCrewCount;
 
-        public List<PartResourceDefinition> GetConsumedResources()
-        {
-            if (resourceConsumption != 0) return new List<PartResourceDefinition>() { ResourceDefinition };
-            else return new List<PartResourceDefinition>();
-        }
+        public List<PartResourceDefinition> GetConsumedResources() => resourceConsumption != 0 ? new List<PartResourceDefinition>() { ResourceDefinition } : new List<PartResourceDefinition>();
 
         PartResourceDefinition ResourceDefinition
         {
@@ -99,14 +100,19 @@ namespace KerbalHealth
             set => resource = value?.name;
         }
 
+        public double RecuperationPower => crewCap > 0 ? recuperation * Math.Min((double)crewCap / TotalAffectedCrewCount, 1) : recuperation;
+
+        public double DecayPower => crewCap > 0 ? decay * Math.Min((double)crewCap / TotalAffectedCrewCount, 1) : decay;
+
         public override void OnStart(StartState state)
         {
-            Core.Log("ModuleKerbalHealth.OnStart(" + state + ")");
+            Core.Log("ModuleKerbalHealth.OnStart(" + state + ") for " + part.name);
             base.OnStart(state);
-            if (alwaysActive)
+            if (IsAlwaysActive)
             {
                 isActive = true;
                 Events["OnToggleActive"].guiActive = false;
+                Events["OnToggleActive"].guiActiveEditor = false;
             }
             UpdateGUIName();
             lastUpdated = Planetarium.GetUniversalTime();
@@ -118,7 +124,7 @@ namespace KerbalHealth
             double time = Planetarium.GetUniversalTime();
             if (isActive && ((resourceConsumption != 0) || (resourceConsumptionPerKerbal != 0)))
             {
-                double res = (resourceConsumption + resourceConsumptionPerKerbal * AffectedCrewCount) * (time - lastUpdated), res2;
+                double res = (resourceConsumption + resourceConsumptionPerKerbal * CappedAffectedCrewCount) * (time - lastUpdated), res2;
                 starving = (res2 = vessel.RequestResource(part, ResourceDefinition.id, res, false)) * 2 < res;
                 if (starving) Core.Log(Title + " Module is starving of " + resource + " (" + res + " needed, " + res2 + " provided).");
             }
@@ -132,12 +138,15 @@ namespace KerbalHealth
                 if (title != "") return title;
                 if (recuperation > 0) return "R&R";
                 if (decay > 0) return "Health Poisoning";
-                switch (multiplyFactor)
+                switch (multiplyFactor.ToLower())
                 {
-                    case "Crowded": return "Comforts";
-                    case "Microgravity": return "Paragravity";
-                    case "Sickness": return "Sick Bay";
+                    case "confinement": return "Comforts";
+                    case "loneliness": return "Meditation";
+                    case "microgravity": return (multiplier <= 0.25) ? "Paragravity" : "Exercise Equipment";
+                    case "connected": return "TV Set";
+                    case "sickness": return "Sick Bay";
                 }
+                if (space > 0) return "Living Space";
                 if (shielding > 0) return "RadShield";
                 if (radioactivity > 0) return "Radiation";
                 return "Health Module";
@@ -147,27 +156,28 @@ namespace KerbalHealth
 
         void UpdateGUIName() => Events["OnToggleActive"].guiName = (isActive ? "Disable " : "Enable ") + Title;
         
-        [KSPEvent(name = "OnToggleActive", guiActive = true, guiName = "Toggle Health Module", guiActiveEditor = false)]
+        [KSPEvent(name = "OnToggleActive", guiActive = true, guiName = "Toggle Health Module", guiActiveEditor = true)]
         public void OnToggleActive()
         {
-            isActive = alwaysActive || !isActive;
+            isActive = IsAlwaysActive || !isActive;
             UpdateGUIName();
         }
 
         public override string GetInfo()
         {
             string res = "";
-            res += Title;
-            if (hpChangePerDay != 0) res += "\nHealth points: " + hpChangePerDay.ToString("F1") + "/day";
+            if (hpChangePerDay != 0) res = "\nHealth points: " + hpChangePerDay.ToString("F1") + "/day";
             if (recuperation != 0) res += "\nRecuperation: " + recuperation.ToString("F1") + "%/day";
             if (decay != 0) res += "\nHealth decay: " + decay.ToString("F1") + "%/day";
             if (multiplier != 1) res += "\n" + multiplier.ToString("F2") + "x " + multiplyFactor;
             if (crewCap > 0) res += " for up to " + crewCap + " kerbal" + (crewCap != 1 ? "s" : "");
-            if (resourceConsumption != 0) res += "\n" + ResourceDefinition.abbreviation + ": " + resourceConsumption.ToString("F1") + "/sec.";
-            if (resourceConsumptionPerKerbal != 0) res += "\n" + ResourceDefinition.abbreviation + " per Kerbal: " + resourceConsumptionPerKerbal.ToString("F1") + "/sec.";
+            if (space != 0) res += "\nSpace: " + space.ToString("F1");
+            if (resourceConsumption != 0) res += "\n" + ResourceDefinition.abbreviation + ": " + resourceConsumption.ToString("F2") + "/sec.";
+            if (resourceConsumptionPerKerbal != 0) res += "\n" + ResourceDefinition.abbreviation + " per Kerbal: " + resourceConsumptionPerKerbal.ToString("F2") + "/sec.";
             if (shielding != 0) res += "\nShielding rating: " + shielding.ToString("F1");
             if (radioactivity != 0) res += "\nRadioactive emission: " + radioactivity.ToString("N0") + "/day";
-            return res.Trim('\n');
+            if (res == "") return "";
+            return "Module type: " + Title + res;
         }
     }
 }
